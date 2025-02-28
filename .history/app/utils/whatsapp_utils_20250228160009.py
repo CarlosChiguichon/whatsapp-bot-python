@@ -3,7 +3,7 @@ from flask import current_app, jsonify
 import json
 import requests
 
-from app.services.openai_service import generate_response
+# from app.services.openai_service import generate_response
 import re
 
 
@@ -25,9 +25,9 @@ def get_text_message_input(recipient, text):
     )
 
 
-#def generate_response(response):
+def generate_response(response):
     # Return text in uppercase
-#   return response.upper()
+    return response.upper()
 
 
 def send_message(data):

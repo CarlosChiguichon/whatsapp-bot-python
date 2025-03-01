@@ -130,78 +130,68 @@ class SessionManager:
         while True:
             time.sleep(30)  # Verificar cada 30 segundos
             
-            users_to_warn = []
-            users_to_close = []
-            
-            # Recopilar usuarios que necesitan atención
             with self.lock:
                 current_time = datetime.now()
+                users_to_process = []
                 
-                for user_id, session in list(self.sessions.items()):
-                    inactive_time = (current_time - session['last_activity']).total_seconds()
-                    
-                    # Usuarios para cerrar sesión
-                    if inactive_time >= self.session_timeout and not session['closing_notice_sent']:
-                        users_to_close.append(user_id)
-                        session['closing_notice_sent'] = True
-                    
-                    # Usuarios para advertir
-                    elif inactive_time >= self.inactivity_warning and not session['inactivity_warning_sent']:
-                        users_to_warn.append(user_id)
-                        session['inactivity_warning_sent'] = True
+                # Recopilar usuarios para procesar fuera del lock
+                for user_id, session in self.sessions.items():
+                    users_to_process.append(user_id)
             
-            # Procesar advertencias fuera del lock
-            for user_id in users_to_warn:
-                self._send_inactivity_warning(user_id)
-            
-            # Procesar cierres fuera del lock
-            for user_id in users_to_close:
-                self._close_inactive_session(user_id)
+            # Procesar usuarios fuera del lock para evitar bloqueos largos
+            for user_id in users_to_process:
+                self._process_user_activity(user_id, current_time)
     
-    def _send_inactivity_warning(self, user_id):
+    def _process_user_activity(self, user_id, current_time):
         """
-        Envía un mensaje de advertencia de inactividad.
+        Procesa la actividad de un usuario y envía mensajes según corresponda.
+        
+        Args:
+            user_id (str): ID de WhatsApp del usuario
+            current_time (datetime): Tiempo actual
         """
-        try:
-            warning_message = "¿Sigues ahí? Tu sesión se cerrará por inactividad en 5 minutos."
+        with self.lock:
+            if user_id not in self.sessions:
+                return
             
-            if self.send_message_func:
-                self.send_message_func(user_id, warning_message)
+            session = self.sessions[user_id]
+            inactive_time = (current_time - session['last_activity']).total_seconds()
             
-            # Registrar mensaje en el historial (sin actualizar last_activity)
-            with self.lock:
-                if user_id in self.sessions:
-                    self.sessions[user_id]['message_history'].append({
-                        'role': 'assistant',
-                        'content': warning_message,
-                        'timestamp': datetime.now().isoformat()
-                    })
-        except Exception as e:
-            print(f"Error al enviar advertencia de inactividad: {str(e)}")
-    
-    def _close_inactive_session(self, user_id):
-        """
-        Cierra una sesión inactiva y envía mensaje de notificación.
-        """
-        try:
-            closing_message = "Tu sesión ha sido cerrada debido a inactividad. Puedes iniciar una nueva conversación cuando lo necesites."
-            
-            if self.send_message_func:
-                self.send_message_func(user_id, closing_message)
-            
-            # Registrar mensaje en el historial antes de eliminar la sesión
-            with self.lock:
-                if user_id in self.sessions:
-                    self.sessions[user_id]['message_history'].append({
-                        'role': 'assistant',
-                        'content': closing_message,
-                        'timestamp': datetime.now().isoformat()
-                    })
+            # Verificar nivel de inactividad y enviar mensajes apropiados
+            if inactive_time >= self.session_timeout and not session['closing_notice_sent']:
+                # Tiempo de expiración alcanzado, cerrar sesión
+                if self.send_message_func:
+                    self.send_message_func(
+                        user_id, 
+                        "Tu sesión ha sido cerrada debido a inactividad. Puedes iniciar una nueva conversación cuando lo necesites."
+                    )
+                    session['closing_notice_sent'] = True
                     
-                    # Eliminar la sesión después de enviar el mensaje
-                    del self.sessions[user_id]
-        except Exception as e:
-            print(f"Error al cerrar sesión inactiva: {str(e)}")
+                # Registrar mensaje en el historial
+                session['message_history'].append({
+                    'role': 'assistant',
+                    'content': "Tu sesión ha sido cerrada debido a inactividad. Puedes iniciar una nueva conversación cuando lo necesites.",
+                    'timestamp': current_time.isoformat()
+                })
+                
+                # Eliminar la sesión
+                del self.sessions[user_id]
+                
+            elif inactive_time >= self.inactivity_warning and not session['inactivity_warning_sent']:
+                # Enviar advertencia de inactividad
+                if self.send_message_func:
+                    self.send_message_func(
+                        user_id, 
+                        "¿Sigues ahí? Tu sesión se cerrará por inactividad en 5 minutos."
+                    )
+                    session['inactivity_warning_sent'] = True
+                    
+                # Registrar mensaje en el historial
+                session['message_history'].append({
+                    'role': 'assistant',
+                    'content': "¿Sigues ahí? Tu sesión se cerrará por inactividad en 5 minutos.",
+                    'timestamp': current_time.isoformat()
+                })
     
     def add_message_to_history(self, user_id, role, content):
         """

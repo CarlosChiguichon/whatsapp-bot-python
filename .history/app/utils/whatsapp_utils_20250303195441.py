@@ -203,7 +203,7 @@ def process_whatsapp_message(body):
         elif context['ticket_step'] == 'description':
             context['ticket_description'] = message_body
             context['ticket_step'] = 'email'
-            response = "Gracias por la información. Para poder dar seguimiento a tu caso, ¿podrías proporcionarme tu correo electrónico? (es importante agregarlo para darle un seguimiento apropiado)."
+            response = "Gracias por la información. Para poder dar seguimiento a tu caso, ¿podrías proporcionarme tu correo electrónico? (Si prefieres no compartirlo, puedes responder 'no')."
         
         # Paso 3: Solicitar email del cliente
         elif context['ticket_step'] == 'email':

@@ -163,7 +163,7 @@ class SessionManager:
         Envía un mensaje de advertencia de inactividad.
         """
         try:
-            warning_message = "¿Sigues ahí? Esta conversación se cerrará por inactividad en 5 minutos. Si ya no necesitas asistencia, puedes responder 'finalizar' para cerrar la conversación."
+            warning_message = "¿Sigues ahí? Tu sesión se cerrará por inactividad en 5 minutos. Si ya no necesitas asistencia, puedes responder 'finalizar' para cerrar la conversación."
             
             if self.send_message_func:
                 self.send_message_func(user_id, warning_message)
